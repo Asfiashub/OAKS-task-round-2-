@@ -1,4 +1,4 @@
-# Milkvault — Dairy Co-op Milk Chilling & Spoilage Tracker
+# MilkVault — Dairy Co-op Milk Chilling & Spoilage Tracker
 
 ## Overview
 
