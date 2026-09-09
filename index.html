@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>SheetalTrack — Milk Chilling &amp; Spoilage Tracker</title>
+<title>MilkVault — Milk Chilling &amp; Spoilage Tracker</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
@@ -311,7 +311,7 @@
 <body>
 
 <header class="top">
-  <h1>SheetalTrack</h1>
+  <h1>MilkVault</h1>
   <p>Milk chilling &amp; spoilage tracker — log drop-offs, watch the clock, protect the vat.</p>
   <span class="mode-badge local" id="modeBadge"><span class="dot2"></span>Checking connection…</span>
 </header>
@@ -404,7 +404,7 @@
 </main>
 
 <footer class="tip">
-  SheetalTrack keeps a shared, append-only log so every agent sees the same batches and the same
+  MilkVault keeps a shared, append-only log so every agent sees the same batches and the same
   clock — timestamps come from the server, not a phone, so they can't be backdated after a dispute.
 </footer>
 
@@ -941,7 +941,7 @@ function buildSmsSummary(){
   const { totalL: vatTotalL } = vatSession(list);
 
   const lines = [];
-  lines.push(`SheetalTrack pickup summary — ${new Date().toLocaleString()}`);
+  lines.push(`MilkVault pickup summary — ${new Date().toLocaleString()}`);
   lines.push(`Pending batches: ${pending.length} (${totalL.toFixed(1)} L)`);
   lines.push(`Vat: ${vatTotalL.toFixed(1)} / ${VAT_CAPACITY_L} L`);
   lines.push(`Urgent (at risk or spoiled): ${urgent.length}`);
