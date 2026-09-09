@@ -74,7 +74,7 @@ These rules keep the prototype's simple no-login workflow. They are suitable for
 
 ## Deploying
 
-Since SheetalTrack is a static website, it can be deployed using any static hosting service.
+Since MilkVault is a static website, it can be deployed using any static hosting service.
 
 ### Netlify Drop
 
