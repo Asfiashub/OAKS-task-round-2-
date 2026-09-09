@@ -1,154 +1,97 @@
-# SheetalTrack — Product Notes
+# SheetalTrack — Design Choices and Trade-offs
 
-## The core problem I designed for
+## The Problem I Wanted to Solve
 
-The brief's real pain point isn't "log some data" — it's that paper
-notebooks give each agent their own private, editable record, so when milk
-sours nobody can agree on whose batch caused it or how long it actually
-sat. A digital form that only one agent can see doesn't fix that; it just
-digitizes the same dispute. So the design priority was: **one shared,
-tamper-evident timeline that every agent looks at**, with the system (not
-the agent) doing the risk judgment.
+Paper notebooks can cause problems at dairy collection centers because each agent keeps their own record. If milk gets spoiled, it becomes difficult to know what happened and who handled the batch. People may have different records, which can lead to arguments.
 
-## Key product trade-offs
+My main goal was to create one shared record that all agents can see. The system also helps identify the risk of spoilage instead of leaving the decision completely to the agent.
 
-**Shared backend over offline-first.** I used Firestore instead of
-per-device local storage specifically so agents across a co-op see the same
-batch list in real time, with server-side timestamps that can't be
-backdated from a phone's clock. The trade-off is that this version needs a
-working internet connection to log or view batches — a real risk in some
-villages. For a production version I'd add a local write queue (IndexedDB)
-that syncs when connectivity returns; I scoped that out of the 48-hour
-build to keep the shared-timeline guarantee solid rather than half-building
-two data paths.
+## Why I Used a Shared Database
 
-**No login system, by design.** Agents type a name once and it's
-remembered on the device — there's no password or account. This matches
-how a paper notebook actually gets used in the field (fast, no friction,
-handed between people), and it's still enough to attribute every entry to
-a name. The trade-off: nothing stops someone from typing a different name
-than their own. That's an acceptable gap for a 48-hour prototype aimed at
-day-to-day accountability, not fraud-proofing; a real deployment would add
-lightweight phone-number verification per agent.
+I used Firestore as a shared online database instead of saving the data only on each agent's phone. This allows all agents to see the same batch information and updates in real time. The timestamps are also created by the server, so they do not depend on the phone's clock.
 
-**Temperature bands instead of a raw number field.** Most collection
-agents won't have a calibrated thermometer on them twice a day. Rather than
-force a precise number (which invites made-up precision), the form uses
-five qualitative bands plus an explicit "no thermometer — assume ambient"
-option, so the tool degrades gracefully instead of blocking the log entry.
+The main disadvantage is that the app needs an internet connection to add or view batches. This can be a problem in villages where the connection may not always be reliable. Since this was a 48-hour project, I decided not to add offline support. Adding incomplete offline support could also affect the main purpose of having one shared record.
 
-**A simplified spoilage model, stated as an assumption, not a certified
-standard.** Remaining safe time is estimated from a lookup table (chilled
-milk ≈ 24h safe window, down to ~1h for milk dropped off very hot), scaled
-against elapsed time since drop-off. Real microbial spoilage kinetics are
-more continuous and depend on initial bacterial load, not just temperature.
-I chose a lookup table over a more "accurate"-looking formula because a
-fake-precise number would be worse than an honest, coarse one — the write-up
-is explicit that a real deployment should have these thresholds reviewed
-against FSSAI / local dairy cooperative guidelines before they're trusted
-operationally.
+In a future version, I can save entries temporarily on the phone and upload them automatically when the internet connection comes back.
 
-**Append-only events, not editable records.** A batch's status changes
-(created, poured, disputed) are stored as an appended event list rather
-than overwritten fields. Nobody can quietly edit history — only add to it.
-This was the single highest-leverage trust decision in the build: it's
-what actually resolves "whose batch spoiled" arguments, because the full
-sequence of who-did-what-when is always visible, not just the current
-state.
+## Why I Did Not Add a Login System
 
-## Edge cases handled
+Agents only enter their name once, and the app remembers it on that device. There is no password or account creation. I chose this because the app is meant to be quick and simple to use, similar to how a paper notebook is used during a work shift.
 
-- **No thermometer available** — explicit fallback band, not a blocked
-  form.
-- **Milk already at risk when the agent wants to pour** — pouring a batch
-  flagged "At risk" or "Spoiled" requires a typed reason before it's
-  accepted, and that reason is permanently attached to the batch. This
-  turns a future argument ("why did you pour bad milk in?") into something
-  answered by the record instead of memory.
-- **Disagreement about a specific batch** — a dedicated "Dispute" action
-  logs the disagreement without deleting or altering the original entry,
-  so both the original claim and the dispute are visible side by side.
-- **Multiple agents logging at the same time** — Firestore assigns each
-  batch its own document ID, so simultaneous submissions from different
-  phones can't collide or overwrite each other.
-- **Page refresh / phone restart mid-shift** — because data lives in
-  Firestore, not the page, refreshing or closing the browser doesn't lose
-  any batches; only the un-submitted "add batch" form resets.
-- **Idle countdowns going stale** — remaining time is recomputed from the
-  stored collection timestamp on every render (every 15s) rather than
-  ticking a counter down client-side, so it can't drift out of sync if a
-  phone's tab is left open for hours.
+The disadvantage is that a person could enter someone else's name. For this prototype, I accepted this limitation because my main focus was simple daily accountability, not complete identity verification.
 
-## Trust mechanisms, summarized
+A future version could use phone-number verification for each agent.
 
-1. **Shared visibility** — every agent sees every batch, in real time, not
-   just their own.
-2. **Server timestamps** — the clock the risk calculation uses comes from
-   Firestore's server, not a phone that could be set wrong (by mistake or
-   otherwise).
-3. **Append-only audit trail** — every action is added to a batch's
-   history, never overwrites it.
-4. **System-computed risk, not self-reported** — the "Safe / Watch / At
-   risk / Spoiled" flag is calculated from timestamp + temperature band by
-   the app, removing the incentive to just say a batch is fine.
-5. **Mandatory reason for risky overrides** — pouring a flagged batch
-   requires a written justification captured at the moment of the
-   decision, not reconstructed afterward when a dispute happens.
+## Why Farmers Are Selected From a List
 
-## Additions: tank monitor, SMS summary, farmer roster, sample data
+Each farmer has a fixed ID, such as F001 to F015. Agents select the farmer from a list instead of typing the name every time.
 
-**Vat capacity monitor.** The vat has its own state (`VAT_CAPACITY_L`,
-currently 300 L — a placeholder for the hub's actual tank size) and its own
-countdown, separate from any individual batch's countdown. The clock starts
-on the *first* pour into an empty vat and resets only when an agent taps
-"Tanker arrived — empty vat." I deliberately used an explicit reset action
-rather than a calendar-day boundary, because collection cycles in the field
-don't reliably align to midnight — a hub might run two full cycles in a
-day, or one cycle spanning two days if a tanker is late. Historical batch
-records are never touched by the reset; only the running fill/countdown
-resets, so "who poured what" stays intact even across cycles.
-`VAT_SAFE_HOURS` (6h) is a planning assumption, stated as such — the same
-caveat as the per-batch model applies: it should be checked against real
-tank performance before being trusted operationally.
+This helps avoid duplicate names caused by different spellings. For example, "Ramesh Yadav" and "ramesh yadav" should not become two different farmer records.
 
-**SMS-ready summary, not real SMS.** The brief's "no paid APIs" constraint
-rules out an actual SMS gateway (Twilio etc.), so the generator composes
-plain text and hands it off via a `sms:?body=` link (opens the phone's own
-messaging app with the text pre-filled) plus a copy-to-clipboard fallback
-for devices where that link doesn't behave predictably. The agent still
-picks the driver's number — the tool doesn't guess or store it.
+There is also an "Other" option for a farmer who has not yet been added to the list. This makes sure that a real milk delivery is not blocked. However, that entry will not have a permanent farmer ID until the farmer is added properly.
 
-**Fixed farmer roster with IDs, plus an escape hatch.** Farmers now come
-from a dropdown with stable IDs (`F001`, `F002`, …) instead of free-typed
-names, which directly serves the trust goal: "Ramesh" typed two different
-ways can no longer become two different people in a dispute. But a rural
-co-op's farmer list changes (new farmers, one-off deliveries from someone
-passing through), so I kept an "Other" option that falls back to free text
-rather than blocking the log entry — that batch just won't have a stable
-ID. A production version would let agents add a new farmer to the shared
-roster on the spot instead.
+## Why I Use Temperature Bands
 
-**Pre-loaded sample data (15 deliveries).** Local demo mode seeds this
-automatically. Shared/Firestore mode shows a one-time "Load sample data"
-banner instead of auto-writing to a real project on every page load — a
-judge (or anyone) opening the live URL repeatedly shouldn't silently
-duplicate 15 fake batches into a real co-op's database. The seed data
-intentionally covers every state (safe/watch/risk/spoiled, a normal pour,
-an override pour, a dispute, a partially-full vat) so the whole feature set
-is visible without needing to manually create each case.
+I did not ask agents to enter an exact temperature because many collection agents may not have a properly calibrated thermometer with them. Asking for an exact number could also lead to people guessing a value.
 
-## What I'd do next with more time
+Instead, the app provides five temperature ranges and an option for cases where there is no thermometer. In that situation, ambient temperature is assumed.
 
-- Tighten the Firestore security rules beyond the current "anyone with the
-  project's API key can read/write" test-mode-equivalent rule — e.g.
-  requiring valid document shape on create and blocking edits to
-  `farmer`/`liters` after creation, so the append-only guarantee is
-  enforced by the database itself and not just by app-code convention.
-- Offline queueing (IndexedDB + background sync) for patchy village
-  connectivity.
-- Lightweight per-agent verification (SMS OTP) instead of a free-text name.
-- Photo attachment on dispute/override events for visual evidence.
-- Replace the lookup-table spoilage model with one calibrated against real
-  dairy cooperative data, ideally per-region (ambient temperature varies a
-  lot across India).
-- A simple daily summary export (CSV) for the co-op's records/accounting.
+This keeps the form simple and allows the agent to continue recording the delivery.
+
+## Why the Spoilage Calculation Is Simple
+
+The app uses a simple lookup table to estimate how much safe time is left for the milk. The estimate is roughly 24 hours for properly chilled milk and can go down to about 1 hour for milk that is delivered very hot.
+
+I chose this simple approach instead of using a complicated formula. Milk spoilage depends on more than temperature, including the starting level of bacteria. Because of this, a complicated formula would not automatically give a more accurate answer.
+
+These values are only planning assumptions and are not a certified food safety standard. Before using the system in real dairy operations, the values should be checked with FSSAI or the relevant local dairy cooperative guidelines.
+
+## Why I Keep History Instead of Replacing It
+
+Whenever something happens to a batch, such as creating it, pouring it, or raising a dispute, the app adds a new event to the history.
+
+The previous information is not quietly replaced. This makes it possible to see what happened, who performed an action, and when it happened.
+
+This is an important part of the project because it helps when there is a disagreement about which batch caused a problem.
+
+## Why the Vat Has a Separate Monitor
+
+An individual batch and the main milk tank are not the same thing. A batch can still be safe even when the tank is almost full or when the tank is waiting too long for pickup.
+
+For this reason, the app shows the vat status separately. It includes the current tank level compared with its capacity and a countdown showing when the pooled milk becomes overdue for collection.
+
+The countdown starts when the first milk is poured into an empty vat. It only resets when an agent confirms that the tanker has arrived. I chose this instead of resetting it every day because tanker collection times do not always follow a fixed daily schedule.
+
+## Why the SMS Feature Does Not Send an Actual SMS
+
+The project requirements do not allow paid SMS APIs, so the app does not send real SMS messages automatically.
+
+Instead, the "Generate pickup summary" feature creates a simple text message containing information such as pending milk volume, vat level, and urgent batches. The agent can then use their phone's messaging option or copy the message and send it to the driver.
+
+The agent still chooses the driver's number and decides when to send the message.
+
+## Edge Cases I Handle
+
+* **No thermometer:** The agent can choose the available temperature fallback instead of being blocked.
+* **Pouring a flagged batch:** The agent must enter a reason before doing so. The reason stays with the batch record.
+* **Batch disagreement:** A dispute is added as a new event without changing the original record.
+* **Two agents working at the same time:** Each batch is stored separately, so entries do not overwrite each other.
+* **Phone restart:** The data is stored in Firestore, so submitted entries are not lost if the phone restarts. Only an entry that was not submitted may be lost.
+* **Old countdown on an open page:** The remaining time is calculated again whenever the page is shown, so it does not depend on how long the page has been left open.
+
+## Main Trust Features
+
+1. All agents can see the same batch information.
+2. The server provides the timestamps instead of relying on the phone's clock.
+3. New actions are added to the history instead of replacing old information.
+4. The app calculates the risk using the recorded time and temperature.
+5. If an agent overrides a risk warning, they must provide a reason.
+
+## What I Would Improve Next
+
+If I continue developing SheetalTrack, I would focus on the following improvements:
+
+* Improve the Firestore security rules so that the history cannot be changed even if someone tries to bypass the app.
+* Add offline support for areas with poor internet connectivity.
+* Add simple phone-number verification for agents.
+* Test and improve the spoilage estimates using real data from local dairy cooperatives.
