@@ -1,8 +1,8 @@
-# SheetalTrack — Dairy Co-op Milk Chilling & Spoilage Tracker
+# Milkvault — Dairy Co-op Milk Chilling & Spoilage Tracker
 
 ## Overview
 
-SheetalTrack is a mobile-friendly web application for dairy collection agents. It helps record milk deliveries, monitor cooling time, identify spoilage risk, and manage milk added to the shared vat.
+MilkVault is a mobile-friendly web application for dairy collection agents. It helps record milk deliveries, monitor cooling time, identify spoilage risk, and manage milk added to the shared vat.
 
 The application uses a single `index.html` file with Firebase Firestore. When Firestore is connected, all agents can see the same batch information and updates.
 
@@ -16,7 +16,7 @@ The main problem this project solves is disagreements between agents about which
 
 If each agent keeps separate records, it is difficult to know which information is correct. A shared database gives everyone the same batch list and timestamps.
 
-SheetalTrack uses Firebase Firestore for real-time sharing. The timestamps are also created by the server instead of relying on each phone's clock.
+MilkVault uses Firebase Firestore for real-time sharing. The timestamps are also created by the server instead of relying on each phone's clock.
 
 The application also has **Local demo mode**. If Firestore is not configured, the app can still be tested, but the data stays in the browser tab and resets after a refresh. For the actual submission, Firestore should be connected so the app works in **Shared live mode**.
 
