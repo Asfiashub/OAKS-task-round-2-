@@ -102,9 +102,9 @@ Run these commands inside the project folder:
 ```bash
 git init
 git add .
-git commit -m "SheetalTrack: dairy chilling & spoilage tracker"
+git commit -m "MilkVault: dairy chilling & spoilage tracker"
 git branch -M main
-git remote add origin https://github.com/<your-username>/sheetaltrack.git
+git remote add origin https://github.com/<your-username>/milkvault.git
 git push -u origin main
 ```
 
@@ -115,8 +115,8 @@ Keep the repository **public** before submitting it.
 There are no dependencies or build steps.
 
 ```bash
-git clone https://github.com/<your-username>/sheetaltrack.git
-cd sheetaltrack
+git clone https://github.com/<your-username>/MilkVault.git
+cd MilkVault
 python3 -m http.server 8000
 ```
 
