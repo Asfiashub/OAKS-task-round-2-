@@ -89,7 +89,7 @@ The agent still chooses the driver's number and decides when to send the message
 
 ## What I Would Improve Next
 
-If I continue developing SheetalTrack, I would focus on the following improvements:
+If I continue developing MilkVault, I would focus on the following improvements:
 
 * Improve the Firestore security rules so that the history cannot be changed even if someone tries to bypass the app.
 * Add offline support for areas with poor internet connectivity.
