@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>SheetalTrack — Milk Chilling &amp; Spoilage Tracker</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --ink:#132126;
+    --steel:#2c4a52;
+    --steel-light:#5c828c;
+    --milk:#fbf9f4;
+    --milk-dim:#f0ede3;
+    --line:#d8d3c4;
+    --safe:#2f7d5c;
+    --safe-bg:#e4f2ea;
+    --watch:#b0781c;
+    --watch-bg:#faf0dd;
+    --risk:#b0401f;
+    --risk-bg:#fbe9e2;
+    --spoiled:#6e1f1f;
+    --spoiled-bg:#f1dcdc;
+    --radius:10px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--milk-dim);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.4;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:64px;
+  }
+  .num, time, .countdown, .liters{
+    font-variant-numeric:tabular-nums;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+
+  header.top{
+    background:var(--steel);
+    color:var(--milk);
+    padding:18px 18px 46px 18px;
+    position:relative;
+  }
+  header.top h1{
+    margin:0;
+    font-size:1.35rem;
+    font-weight:700;
+    letter-spacing:0.01em;
+  }
+  header.top p{
+    margin:4px 0 0;
+    color:#cfe0e3;
+    font-size:0.85rem;
+  }
+  .summary-bar{
+    background:var(--milk);
+    border-radius:var(--radius);
+    margin:-32px 14px 0 14px;
+    padding:14px 16px;
+    display:flex;
+    justify-content:space-between;
+    box-shadow:0 2px 10px rgba(19,33,38,0.18);
+    position:relative;
+    z-index:2;
+  }
+  .summary-bar .cell{text-align:center;flex:1;}
+  .summary-bar .cell + .cell{border-left:1px solid var(--line);}
+  .summary-bar .cell .n{display:block;font-size:1.35rem;font-weight:700;}
+  .summary-bar .cell .lbl{display:block;font-size:0.7rem;color:var(--steel-light);margin-top:2px;}
+  .summary-bar .n.red{color:var(--risk);}
+  .summary-bar .n.amber{color:var(--watch);}
+
+  main{padding:22px 14px 0;max-width:640px;margin:0 auto;}
+
+  .agent-strip{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    background:var(--milk);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:10px 12px;
+    margin-bottom:16px;
+    font-size:0.85rem;
+  }
+  .agent-strip input{
+    border:none;background:transparent;font-size:0.9rem;font-weight:600;
+    flex:1;color:var(--ink);outline:none;
+  }
+  .agent-strip .dot{width:8px;height:8px;border-radius:50%;background:var(--safe);flex-shrink:0;}
+  .agent-strip .dot.off{background:#b8b2a1;}
+
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border:none;
+  }
+  .btn-primary{
+    background:var(--steel);
+    color:var(--milk);
+    padding:13px 18px;
+    border-radius:var(--radius);
+    font-size:0.95rem;
+    font-weight:600;
+    width:100%;
+  }
+  .btn-primary:active{background:var(--ink);}
+  .btn-ghost{
+    background:transparent;
+    border:1px solid var(--line);
+    color:var(--steel);
+    padding:9px 12px;
+    border-radius:8px;
+    font-size:0.82rem;
+    font-weight:600;
+  }
+  .btn-danger{
+    background:var(--risk);
+    color:var(--milk);
+    padding:9px 12px;
+    border-radius:8px;
+    font-size:0.82rem;
+    font-weight:600;
+  }
+
+  .panel{
+    background:var(--milk);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px;
+    margin-bottom:16px;
+  }
+  .panel h2{margin:0 0 12px;font-size:1rem;font-weight:700;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:0.78rem;color:var(--steel-light);margin-bottom:4px;font-weight:600;}
+  .field input, .field select, .field textarea{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    font-size:0.95rem;
+    background:#fff;
+    color:var(--ink);
+    font-family:inherit;
+  }
+  .field textarea{resize:vertical;min-height:56px;}
+  .temp-choices{display:flex;flex-wrap:wrap;gap:6px;}
+  .temp-choices button{
+    flex:1 1 30%;
+    padding:9px 6px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:#fff;
+    font-size:0.78rem;
+    color:var(--steel);
+  }
+  .temp-choices button.sel{background:var(--steel);color:var(--milk);border-color:var(--steel);}
+
+  .section-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    margin:26px 0 10px;
+  }
+  .section-head h2{margin:0;font-size:0.95rem;font-weight:700;}
+  .section-head span{font-size:0.75rem;color:var(--steel-light);}
+
+  .batch{
+    background:var(--milk);
+    border:1px solid var(--line);
+    border-left-width:5px;
+    border-radius:var(--radius);
+    padding:14px 14px 12px;
+    margin-bottom:10px;
+  }
+  .batch.safe{border-left-color:var(--safe);}
+  .batch.watch{border-left-color:var(--watch);}
+  .batch.risk{border-left-color:var(--risk);}
+  .batch.spoiled{border-left-color:var(--spoiled);}
+
+  .batch-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .batch-top .who{font-weight:700;font-size:0.98rem;}
+  .batch-top .meta{font-size:0.78rem;color:var(--steel-light);margin-top:2px;}
+  .badge{
+    font-size:0.72rem;
+    font-weight:700;
+    padding:3px 9px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .badge.safe{background:var(--safe-bg);color:var(--safe);}
+  .badge.watch{background:var(--watch-bg);color:var(--watch);}
+  .badge.risk{background:var(--risk-bg);color:var(--risk);}
+  .badge.spoiled{background:var(--spoiled-bg);color:var(--spoiled);}
+
+  .countdown-row{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed var(--line);
+  }
+  .countdown-row .countdown{font-size:1.15rem;font-weight:700;}
+  .countdown-row .countdown.safe{color:var(--safe);}
+  .countdown-row .countdown.watch{color:var(--watch);}
+  .countdown-row .countdown.risk{color:var(--risk);}
+  .countdown-row .countdown.spoiled{color:var(--spoiled);}
+  .countdown-row .liters{font-size:0.85rem;color:var(--steel-light);}
+
+  .batch-actions{display:flex;gap:8px;margin-top:12px;}
+  .batch-actions button{flex:1;}
+
+  details{margin-top:10px;}
+  details summary{
+    font-size:0.76rem;color:var(--steel-light);cursor:pointer;list-style:none;
+  }
+  details summary::-webkit-details-marker{display:none;}
+  details summary:before{content:"Audit trail ";}
+  .events{margin-top:8px;font-size:0.78rem;}
+  .events .ev{padding:5px 0;border-top:1px solid var(--line);}
+  .events .ev:first-child{border-top:none;}
+  .events .ev .t{color:var(--steel-light);}
+
+  .disputed-tag{
+    display:inline-block;background:var(--spoiled-bg);color:var(--spoiled);
+    font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:12px;margin-top:6px;
+  }
+
+  .empty{
+    text-align:center;color:var(--steel-light);font-size:0.85rem;
+    padding:30px 10px;border:1px dashed var(--line);border-radius:var(--radius);
+  }
+
+  .vat-log{font-size:0.82rem;}
+  .vat-log .row{display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--line);}
+  .vat-log .row:first-child{border-top:none;}
+  .vat-log .row .l{color:var(--steel-light);}
+
+  .toast{
+    position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:var(--milk);padding:10px 18px;border-radius:24px;
+    font-size:0.82rem;box-shadow:0 4px 14px rgba(0,0,0,0.25);
+    z-index:50;opacity:0;pointer-events:none;transition:opacity .2s;
+  }
+  .toast.show{opacity:1;}
+
+  .modal-back{
+    position:fixed;inset:0;background:rgba(19,33,38,0.55);
+    display:flex;align-items:flex-end;justify-content:center;z-index:60;
+  }
+  .modal{
+    background:var(--milk);width:100%;max-width:520px;border-radius:16px 16px 0 0;
+    padding:20px;
+  }
+  .modal h3{margin:0 0 8px;font-size:1rem;}
+  .modal p{margin:0 0 12px;font-size:0.85rem;color:var(--steel-light);}
+  .modal-btns{display:flex;gap:10px;margin-top:14px;}
+
+  .config-warning{
+    background:var(--risk-bg);color:var(--spoiled);border:1px solid var(--risk);
+    border-radius:var(--radius);padding:14px;margin:14px;font-size:0.85rem;
+  }
+  .config-warning code{background:#fff;padding:1px 5px;border-radius:4px;}
+
+  .mode-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:0.72rem;font-weight:700;padding:3px 10px;border-radius:20px;
+  }
+  .mode-badge.live{background:var(--safe-bg);color:var(--safe);}
+  .mode-badge.local{background:var(--watch-bg);color:var(--watch);}
+  .mode-badge .dot2{width:7px;height:7px;border-radius:50%;background:currentColor;}
+
+  .seed-banner{
+    background:var(--watch-bg);border:1px solid var(--watch);color:#7a5410;
+    border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:0.82rem;
+  }
+  .seed-banner button{margin-top:8px;}
+
+  .vat-card .fillwrap{
+    background:var(--milk-dim);border:1px solid var(--line);border-radius:8px;
+    height:16px;overflow:hidden;margin:10px 0 8px;
+  }
+  .vat-card .fill{height:100%;background:var(--safe);transition:width .3s;}
+  .vat-card .fill.watch{background:var(--watch);}
+  .vat-card .fill.risk{background:var(--risk);}
+  .vat-card .fillrow{display:flex;justify-content:space-between;font-size:0.82rem;color:var(--steel-light);}
+  .vat-card .vat-countdown{font-size:1.05rem;font-weight:700;margin-top:10px;}
+  .vat-card .vat-countdown.safe{color:var(--safe);}
+  .vat-card .vat-countdown.watch{color:var(--watch);}
+  .vat-card .vat-countdown.risk{color:var(--risk);}
+  .vat-card .vat-empty-note{font-size:0.82rem;color:var(--steel-light);margin-top:6px;}
+  .vat-card .vat-actions{display:flex;gap:8px;margin-top:12px;}
+
+  .sms-summary textarea{
+    width:100%;min-height:150px;font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    font-size:0.82rem;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);
+  }
+  .btn-sms{
+    background:var(--milk);border:1px solid var(--steel);color:var(--steel);
+    padding:10px 14px;border-radius:var(--radius);font-size:0.85rem;font-weight:700;width:100%;margin-bottom:16px;
+  }
+
+  footer.tip{
+    max-width:640px;margin:24px auto 0;padding:0 14px 24px;
+    font-size:0.72rem;color:var(--steel-light);text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>SheetalTrack</h1>
+  <p>Milk chilling &amp; spoilage tracker — log drop-offs, watch the clock, protect the vat.</p>
+  <span class="mode-badge local" id="modeBadge"><span class="dot2"></span>Checking connection…</span>
+</header>
+
+<div class="summary-bar" id="summaryBar">
+  <div class="cell"><span class="n" id="sumPending">0</span><span class="lbl">Pending batches</span></div>
+  <div class="cell"><span class="n amber" id="sumWatch">0</span><span class="lbl">Under watch</span></div>
+  <div class="cell"><span class="n red" id="sumRisk">0</span><span class="lbl">At risk</span></div>
+</div>
+
+<main>
+
+  <div id="configWarning" style="display:none" class="config-warning">
+    <strong>Not connected yet.</strong> This copy is running without a database, so entries
+    will only be visible on this device and will disappear on refresh. Open
+    <code>index.html</code>, fill in <code>FIREBASE_CONFIG</code> near the top of the script
+    with your own free Firestore project keys, and reload. See README.md for the 5-minute setup.
+  </div>
+
+  <div id="seedBanner" class="seed-banner" style="display:none">
+    <strong>This shared database is empty.</strong> Load 15 realistic sample deliveries
+    (mixed risk levels, one dispute, a couple already poured) so the dashboard is easy to
+    review — safe to delete later.
+    <div><button class="btn-ghost" id="seedBtn">Load sample data</button></div>
+  </div>
+
+  <div class="agent-strip">
+    <span class="dot" id="connDot"></span>
+    <input id="agentName" placeholder="Your name (agent logging in)" />
+  </div>
+
+  <button class="btn-sms" id="smsBtn" type="button">Generate pickup summary for tanker driver</button>
+
+  <div class="panel vat-card" id="vatCard">
+    <h2>Vat status</h2>
+    <div class="fillrow"><span id="vatFillLabel">0 L used</span><span id="vatCapLabel">of 300 L capacity</span></div>
+    <div class="fillwrap"><div class="fill" id="vatFill" style="width:0%"></div></div>
+    <div class="vat-countdown safe" id="vatCountdown">Vat is empty</div>
+    <div class="vat-empty-note">Assumes the bulk tank itself stays chilled; countdown is time until the tanker
+      pickup is considered overdue, not a food-safety certification — see TRADEOFFS.md.</div>
+    <div class="vat-actions">
+      <button class="btn-ghost" id="emptyVatBtn" style="flex:1">Tanker arrived — empty vat</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Log a drop-off</h2>
+    <div class="field">
+      <label for="farmerSelect">Farmer</label>
+      <select id="farmerSelect"></select>
+    </div>
+    <div class="field" id="farmerOtherField" style="display:none">
+      <label for="farmerOther">Farmer name (not in roster)</label>
+      <input id="farmerOther" placeholder="e.g. new farmer's full name" />
+    </div>
+    <div class="field">
+      <label for="liters">Quantity (litres)</label>
+      <input id="liters" type="number" inputmode="decimal" min="0" step="0.1" placeholder="e.g. 12.5" />
+    </div>
+    <div class="field">
+      <label>Milk temperature at drop-off</label>
+      <div class="temp-choices" id="tempChoices">
+        <button type="button" data-band="chilled">Chilled (≤4°C)</button>
+        <button type="button" data-band="cool">Cool (5–10°C)</button>
+        <button type="button" data-band="warm">Warm (11–20°C)</button>
+        <button type="button" data-band="hot">Hot (21–30°C)</button>
+        <button type="button" data-band="veryhot">Very hot (&gt;30°C)</button>
+        <button type="button" data-band="unknown" class="sel">No thermometer — assume ambient</button>
+      </div>
+    </div>
+    <div class="field">
+      <label for="noteIn">Note (optional)</label>
+      <textarea id="noteIn" placeholder="Anything unusual about this batch..."></textarea>
+    </div>
+    <button class="btn-primary" id="logBtn">Log drop-off</button>
+  </div>
+
+  <div class="section-head">
+    <h2>Pending batches — not yet in the vat</h2>
+    <span id="pendingCount"></span>
+  </div>
+  <div id="pendingList"></div>
+
+  <div class="section-head">
+    <h2>Current vat cycle</h2>
+    <span id="vatTotal"></span>
+  </div>
+  <div class="panel vat-log" id="vatLog"><div class="empty">No batches poured into this vat cycle yet.</div></div>
+
+</main>
+
+<footer class="tip">
+  SheetalTrack keeps a shared, append-only log so every agent sees the same batches and the same
+  clock — timestamps come from the server, not a phone, so they can't be backdated after a dispute.
+</footer>
+
+<div class="toast" id="toast"></div>
+<div id="smsModalRoot"></div>
+
+<script>
+/* ====================== CONFIG ======================
+   Paste your Firebase project's web config below. Firestore's free tier
+   is more than enough for a co-op's daily volume. See README.md for setup.
+   Leaving this blank runs the app in "local only" demo mode (see below).
+======================================================= */
+const FIREBASE_CONFIG = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
+};
+
+/* ---------- spoilage model ----------
+   Simplified safe-holding windows by temperature band, from collection
+   time to when the batch should be treated as high risk for souring.
+   These are planning thresholds for a field tool, not a certified food
+   safety standard — see TRADEOFFS.md for the reasoning and citations
+   you should swap in for your write-up. */
+const SAFE_HOURS = {
+  chilled: 24,   // properly chilled, at or under 4°C
+  cool:    8,
+  warm:    4,
+  hot:     2,
+  veryhot: 1,
+  unknown: 2.5   // no thermometer reading — assume a warm village afternoon
+};
+const TEMP_LABELS = {
+  chilled:"Chilled (≤4°C)", cool:"Cool (5–10°C)", warm:"Warm (11–20°C)",
+  hot:"Hot (21–30°C)", veryhot:"Very hot (>30°C)", unknown:"Unknown (ambient assumed)"
+};
+
+/* ---------- farmer roster ----------
+   Fixed, known farmers get a stable ID instead of free-typed names, so
+   "Ramesh" and "ramesh yadav" can't become two different people in a
+   dispute. "Other" stays available for a farmer not yet on the roster —
+   see TRADEOFFS.md for why this isn't a hard requirement. */
+const FARMERS = [
+  { id:"F001", name:"Ramesh Yadav" },
+  { id:"F002", name:"Sita Devi" },
+  { id:"F003", name:"Anil Kumar" },
+  { id:"F004", name:"Lakshmi Reddy" },
+  { id:"F005", name:"Suresh Patil" },
+  { id:"F006", name:"Geeta Sharma" },
+  { id:"F007", name:"Manoj Verma" },
+  { id:"F008", name:"Kavita Singh" },
+  { id:"F009", name:"Rajesh Gowda" },
+  { id:"F010", name:"Meena Kumari" },
+  { id:"F011", name:"Vijay Naik" },
+  { id:"F012", name:"Sunita Rani" },
+  { id:"F013", name:"Arjun Das" },
+  { id:"F014", name:"Pooja Iyer" },
+  { id:"F015", name:"Deepak Chauhan" }
+];
+
+/* ---------- vat (bulk tank) model ----------
+   VAT_CAPACITY_L is the physical size of the collection hub's chilling
+   tank — adjust to match the real hardware at deployment. VAT_SAFE_HOURS
+   is a planning assumption (not a certified standard): once the first
+   batch is poured in, the tanker is assumed to need to arrive within this
+   window before the pooled milk is treated as overdue for pickup. */
+const VAT_CAPACITY_L = 300;
+const VAT_SAFE_HOURS = 6;
+let vatState = { startedAt: null }; // ms epoch; null = vat currently empty
+
+let selectedBand = "unknown";
+let usingFirestore = false;
+let db = null;
+let unsub = null;
+let vatUnsub = null;
+let localBatches = []; // used only when Firestore isn't configured
+let firestoreSnapshotReceived = false;
+
+const $ = (id) => document.getElementById(id);
+
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._h);
+  toast._h = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+// ---------- agent identity (device-level, no login system) ----------
+$("agentName").value = localStorage.getItem("sheetal_agent") || "";
+$("agentName").addEventListener("input", (e)=>{
+  localStorage.setItem("sheetal_agent", e.target.value);
+});
+function currentAgent(){
+  const v = $("agentName").value.trim();
+  return v || "Unnamed agent";
+}
+
+// ---------- farmer roster dropdown ----------
+(function initFarmerSelect(){
+  const sel = $("farmerSelect");
+  sel.innerHTML = FARMERS.map(f=>`<option value="${f.id}">${f.id} — ${escapeHtml(f.name)}</option>`).join("")
+    + `<option value="__other">Other (not in roster)</option>`;
+  sel.addEventListener("change", ()=>{
+    $("farmerOtherField").style.display = sel.value === "__other" ? "block" : "none";
+  });
+})();
+function selectedFarmer(){
+  const sel = $("farmerSelect");
+  if (sel.value === "__other"){
+    const name = $("farmerOther").value.trim();
+    return name ? { farmerId: null, farmer: name } : null;
+  }
+  const f = FARMERS.find(x=>x.id === sel.value);
+  return f ? { farmerId: f.id, farmer: f.name } : null;
+}
+
+// ---------- temperature band picker ----------
+$("tempChoices").addEventListener("click",(e)=>{
+  const b = e.target.closest("button");
+  if(!b) return;
+  selectedBand = b.dataset.band;
+  [...$("tempChoices").children].forEach(c=>c.classList.remove("sel"));
+  b.classList.add("sel");
+});
+
+// ---------- risk calculation ----------
+function riskFor(collectedAtMs, band){
+  const safeH = SAFE_HOURS[band] ?? SAFE_HOURS.unknown;
+  const elapsedH = (Date.now() - collectedAtMs) / 3600000;
+  const remainingH = safeH - elapsedH;
+  const pctRemaining = remainingH / safeH;
+  let level;
+  if (remainingH <= 0) level = "spoiled";
+  else if (pctRemaining < 0.2) level = "risk";
+  else if (pctRemaining < 0.5) level = "watch";
+  else level = "safe";
+  return { safeH, elapsedH, remainingH, level };
+}
+function fmtHM(hours){
+  const sign = hours < 0 ? "-" : "";
+  const abs = Math.abs(hours);
+  const h = Math.floor(abs);
+  const m = Math.round((abs - h) * 60);
+  return `${sign}${h}h ${String(m).padStart(2,"0")}m`;
+}
+function levelLabel(level){
+  return { safe:"Safe", watch:"Watch", risk:"At risk", spoiled:"Spoiled" }[level];
+}
+
+// ---------- logging a new batch ----------
+$("logBtn").addEventListener("click", async ()=>{
+  const who = selectedFarmer();
+  const liters = parseFloat($("liters").value);
+  if(!who){ toast("Choose a farmer, or type a name under 'Other'"); return; }
+  if(!liters || liters <= 0){ toast("Enter a valid quantity"); return; }
+
+  const agent = currentAgent();
+  const batch = {
+    farmer: who.farmer, farmerId: who.farmerId, liters, band: selectedBand,
+    note: $("noteIn").value.trim(),
+    status: "pending",
+    createdBy: agent,
+    events: [{ type:"created", by: agent, at: nowVal(), detail: `Logged ${liters} L, temp: ${TEMP_LABELS[selectedBand]}` }]
+  };
+
+  if (usingFirestore){
+    batch.collectedAt = firebase.firestore.FieldValue.serverTimestamp();
+    batch.events[0].at = new Date().toISOString(); // event log uses client time for display only
+    await db.collection("batches").add(batch);
+  } else {
+    batch.id = "local_" + Date.now();
+    batch.collectedAt = { toMillis: () => Date.now() };
+    localBatches.unshift(batch);
+    render();
+  }
+
+  $("farmerSelect").selectedIndex = 0;
+  $("farmerOtherField").style.display = "none";
+  $("farmerOther").value = "";
+  $("liters").value = "";
+  $("noteIn").value = "";
+  toast("Batch logged");
+});
+
+function nowVal(){ return new Date().toISOString(); }
+
+// ---------- pour to vat / dispute ----------
+function askConfirm({title, body, confirmLabel, danger}){
+  return new Promise((resolve)=>{
+    const back = document.createElement("div");
+    back.className = "modal-back";
+    back.innerHTML = `
+      <div class="modal">
+        <h3>${title}</h3>
+        <p>${body}</p>
+        <div class="field" id="reasonField" style="display:none">
+          <label>Reason (required)</label>
+          <textarea id="reasonInput" placeholder="Why pour despite the risk?"></textarea>
+        </div>
+        <div class="modal-btns">
+          <button class="btn-ghost" id="cancelBtn" style="flex:1">Cancel</button>
+          <button class="${danger ? 'btn-danger' : 'btn-primary'}" id="okBtn" style="flex:1">${confirmLabel}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);
+    if (danger) back.querySelector("#reasonField").style.display = "block";
+    back.querySelector("#cancelBtn").onclick = ()=>{ back.remove(); resolve(null); };
+    back.querySelector("#okBtn").onclick = ()=>{
+      const reason = danger ? back.querySelector("#reasonInput").value.trim() : "";
+      if (danger && !reason){ toast("A reason is required to override"); return; }
+      back.remove();
+      resolve({ reason });
+    };
+  });
+}
+
+async function pourBatch(id, level){
+  const danger = (level === "risk" || level === "spoiled");
+  const res = await askConfirm({
+    title: danger ? "Pour despite risk?" : "Pour this batch into the vat?",
+    body: danger
+      ? "This batch is flagged " + levelLabel(level).toLowerCase() + ". Pouring will be recorded against your name with the reason you give, so anyone reviewing later can see who made the call and why."
+      : "This will mark the batch as poured and add it to today's vat log.",
+    confirmLabel: "Confirm pour",
+    danger
+  });
+  if (!res) return;
+  await ensureVatStarted();
+  await addEvent(id, {
+    type: danger ? "poured_override" : "poured",
+    by: currentAgent(),
+    at: nowVal(),
+    detail: danger ? `Poured despite ${levelLabel(level)} — ${res.reason}` : "Poured into main vat"
+  }, "poured");
+  toast("Recorded as poured");
+}
+
+// ---------- vat (bulk tank) session ----------
+async function ensureVatStarted(){
+  if (vatState.startedAt) return; // vat already has milk in it, session already running
+  if (usingFirestore){
+    await db.collection("meta").doc("vat").set(
+      { startedAt: firebase.firestore.FieldValue.serverTimestamp(), capacityL: VAT_CAPACITY_L },
+      { merge: true }
+    );
+  } else {
+    vatState.startedAt = Date.now();
+    render();
+  }
+}
+
+async function emptyVat(){
+  const res = await askConfirm({
+    title: "Tanker arrived?",
+    body: "This marks the vat as picked up and empty. Individual batch records stay in history " +
+          "for good — only the capacity gauge and vat countdown reset for the next collection cycle.",
+    confirmLabel: "Confirm pickup",
+    danger: false
+  });
+  if (!res) return;
+  if (usingFirestore){
+    await db.collection("meta").doc("vat").set({ startedAt: null }, { merge: true });
+  } else {
+    vatState.startedAt = null;
+    render();
+  }
+  toast("Vat marked emptied");
+}
+$("emptyVatBtn").addEventListener("click", emptyVat);
+
+// batches poured since the vat's current session began (i.e. since it was last emptied)
+function vatSession(list){
+  if (!vatState.startedAt) return { pouredList: [], totalL: 0 };
+  const pouredList = list.filter(b=>{
+    if (b.status !== "poured") return false;
+    const lastEv = (b.events||[]).slice().reverse().find(e=>e.type && e.type.indexOf("poured")===0);
+    const at = lastEv ? new Date(lastEv.at).getTime() : 0;
+    return at >= vatState.startedAt - 1000; // small buffer for clock skew
+  });
+  const totalL = pouredList.reduce((s,b)=>s+Number(b.liters||0), 0);
+  return { pouredList, totalL };
+}
+
+async function disputeBatch(id){
+  const back = document.createElement("div");
+  back.className = "modal-back";
+  back.innerHTML = `
+    <div class="modal">
+      <h3>Flag a dispute</h3>
+      <p>Describe the disagreement — e.g. wrong quantity, wrong farmer, or a claim the milk was already spoiled at drop-off. This is added to the batch's permanent record.</p>
+      <div class="field"><textarea id="disputeText" placeholder="What's the dispute?"></textarea></div>
+      <div class="modal-btns">
+        <button class="btn-ghost" id="cBtn" style="flex:1">Cancel</button>
+        <button class="btn-danger" id="sBtn" style="flex:1">Log dispute</button>
+      </div>
+    </div>`;
+  document.body.appendChild(back);
+  back.querySelector("#cBtn").onclick = ()=>back.remove();
+  back.querySelector("#sBtn").onclick = async ()=>{
+    const text = back.querySelector("#disputeText").value.trim();
+    if(!text){ toast("Describe the dispute first"); return; }
+    await addEvent(id, { type:"disputed", by: currentAgent(), at: nowVal(), detail: text }, "disputed");
+    back.remove();
+    toast("Dispute logged");
+  };
+}
+
+async function addEvent(id, event, newStatus){
+  if (usingFirestore){
+    const ref = db.collection("batches").doc(id);
+    const snap = await ref.get();
+    const events = (snap.data().events || []).concat(event);
+    await ref.update({ events, status: newStatus || snap.data().status });
+  } else {
+    const b = localBatches.find(x=>x.id===id);
+    if (!b) return;
+    b.events.push(event);
+    if (newStatus) b.status = newStatus;
+    render();
+  }
+}
+
+// ---------- rendering ----------
+function render(){
+  const list = usingFirestore ? currentFirestoreBatches : localBatches;
+  const pending = list.filter(b=>b.status==="pending" || b.status==="disputed");
+  const { pouredList: poured, totalL: vatTotalL } = vatSession(list);
+
+  // sort pending by most urgent first
+  const withRisk = pending.map(b=>{
+    const ms = b.collectedAt && b.collectedAt.toMillis ? b.collectedAt.toMillis() : Date.now();
+    return { b, r: riskFor(ms, b.band), ms };
+  });
+  withRisk.sort((a,b)=>a.r.remainingH - b.r.remainingH);
+
+  $("pendingCount").textContent = pending.length + (pending.length===1 ? " batch" : " batches");
+  $("sumPending").textContent = pending.length;
+  $("sumWatch").textContent = withRisk.filter(x=>x.r.level==="watch").length;
+  $("sumRisk").textContent = withRisk.filter(x=>x.r.level==="risk" || x.r.level==="spoiled").length;
+
+  const container = $("pendingList");
+  if (withRisk.length === 0){
+    container.innerHTML = `<div class="empty">No pending batches. Log a drop-off above to get started.</div>`;
+  } else {
+    container.innerHTML = withRisk.map(({b, r})=>{
+      const disputedTag = b.status === "disputed" ? `<div class="disputed-tag">Disputed</div>` : "";
+      const eventsHtml = (b.events||[]).slice().reverse().map(ev=>`
+        <div class="ev"><span class="t">${new Date(ev.at).toLocaleString()}</span> — <strong>${ev.by}</strong>: ${escapeHtml(ev.detail)}</div>
+      `).join("");
+      return `
+        <div class="batch ${r.level}" data-id="${b.id}">
+          <div class="batch-top">
+            <div>
+              <div class="who">${b.farmerId ? `<span class="num">${b.farmerId}</span> · ` : ""}${escapeHtml(b.farmer)}</div>
+              <div class="meta">Logged by ${escapeHtml(b.createdBy)} · ${TEMP_LABELS[b.band]}${b.note ? " · " + escapeHtml(b.note) : ""}</div>
+            </div>
+            <span class="badge ${r.level}">${levelLabel(r.level)}</span>
+          </div>
+          ${disputedTag}
+          <div class="countdown-row">
+            <span class="countdown ${r.level}">${r.remainingH>0 ? fmtHM(r.remainingH)+" left" : "Over by "+fmtHM(-r.remainingH)}</span>
+            <span class="liters">${b.liters} L</span>
+          </div>
+          <div class="batch-actions">
+            <button class="btn-primary" onclick="pourBatch('${b.id}','${r.level}')">Pour to vat</button>
+            <button class="btn-ghost" onclick="disputeBatch('${b.id}')">Dispute</button>
+          </div>
+          <details><summary>${(b.events||[]).length} event${(b.events||[]).length===1?"":"s"}</summary>
+            <div class="events">${eventsHtml}</div>
+          </details>
+        </div>
+      `;
+    }).join("");
+  }
+
+  renderVatCard(vatTotalL);
+
+  const vatContainer = $("vatLog");
+  $("vatTotal").textContent = poured.length ? `${vatTotalL.toFixed(1)} L total` : "";
+  if (poured.length === 0){
+    vatContainer.innerHTML = `<div class="empty">No batches poured into this vat cycle yet.</div>`;
+  } else {
+    vatContainer.innerHTML = poured.slice().reverse().map(b=>{
+      const lastEv = (b.events||[]).slice().reverse().find(e=>e.type.startsWith("poured"));
+      const overridden = lastEv && lastEv.type === "poured_override";
+      return `<div class="row">
+        <span class="l">${b.farmerId ? b.farmerId + " · " : ""}${escapeHtml(b.farmer)} · ${lastEv ? new Date(lastEv.at).toLocaleTimeString() : ""}${overridden ? " · override" : ""}</span>
+        <span>${b.liters} L</span>
+      </div>`;
+    }).join("");
+  }
+}
+
+function renderVatCard(vatTotalL){
+  const pct = Math.min(100, (vatTotalL / VAT_CAPACITY_L) * 100);
+  const fillEl = $("vatFill");
+  fillEl.style.width = pct + "%";
+  fillEl.classList.remove("watch","risk");
+  if (pct >= 90) fillEl.classList.add("risk");
+  else if (pct >= 70) fillEl.classList.add("watch");
+
+  $("vatFillLabel").textContent = `${vatTotalL.toFixed(1)} L used`;
+  $("vatCapLabel").textContent = `of ${VAT_CAPACITY_L} L capacity`;
+
+  const cd = $("vatCountdown");
+  const note = $("emptyVatBtn");
+  if (!vatState.startedAt){
+    cd.textContent = "Vat is empty — countdown starts on first pour";
+    cd.className = "vat-countdown safe";
+    note.disabled = true;
+    note.style.opacity = 0.5;
+  } else {
+    const elapsedH = (Date.now() - vatState.startedAt) / 3600000;
+    const remainingH = VAT_SAFE_HOURS - elapsedH;
+    const pctRemaining = remainingH / VAT_SAFE_HOURS;
+    let level = "safe";
+    if (remainingH <= 0) level = "risk";
+    else if (pctRemaining < 0.35) level = "watch";
+    cd.textContent = (remainingH > 0 ? fmtHM(remainingH) + " until pickup overdue" : "Pickup overdue by " + fmtHM(-remainingH))
+      + (pct >= 90 ? " · tank nearly full" : "");
+    cd.className = "vat-countdown " + (level === "risk" ? "risk" : level);
+    note.disabled = false;
+    note.style.opacity = 1;
+  }
+}
+
+function escapeHtml(s){
+  return String(s||"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// ---------- mock/demo data (15 realistic deliveries, one per roster farmer) ----------
+// Mixed on purpose: several risk levels, one already-poured normal batch, one
+// poured-with-override, and one disputed — so a reviewer sees the whole
+// feature set without having to manually create every state.
+const MOCK_SPEC = [
+  { farmerId:"F001", liters:14, band:"chilled", hoursAgo:1,    status:"pending"  },
+  { farmerId:"F002", liters:11, band:"cool",    hoursAgo:2,    status:"pending"  },
+  { farmerId:"F003", liters:9,  band:"warm",    hoursAgo:1,    status:"pending"  },
+  { farmerId:"F004", liters:13, band:"warm",    hoursAgo:2.5,  status:"pending"  },
+  { farmerId:"F005", liters:10, band:"hot",     hoursAgo:1.2,  status:"pending"  },
+  { farmerId:"F006", liters:16, band:"hot",     hoursAgo:1.8,  status:"pending"  },
+  { farmerId:"F007", liters:8,  band:"veryhot", hoursAgo:0.9,  status:"pending"  },
+  { farmerId:"F008", liters:12, band:"veryhot", hoursAgo:1.3,  status:"pending"  },
+  { farmerId:"F009", liters:15, band:"unknown", hoursAgo:2,    status:"pending"  },
+  { farmerId:"F010", liters:9,  band:"cool",    hoursAgo:7,    status:"pending"  },
+  { farmerId:"F011", liters:20, band:"chilled", hoursAgo:20,   status:"pending"  },
+  { farmerId:"F012", liters:11, band:"warm",    hoursAgo:3.9,  status:"pending"  },
+  { farmerId:"F013", liters:18, band:"chilled", hoursAgo:3,    status:"poured",          pouredHoursAgo:2.9 },
+  { farmerId:"F014", liters:14, band:"hot",     hoursAgo:2.6,  status:"poured_override", pouredHoursAgo:2.5,
+    reason:"Tanker was already at the gate; agent judged it still usable and recorded the override." },
+  { farmerId:"F015", liters:12, band:"cool",    hoursAgo:4,    status:"disputed",
+    disputeText:"Farmer says quantity was 15 L, not 12 L as logged." }
+];
+const MOCK_VAT_STARTED_HOURS_AGO = 2.9; // matches the earliest mock pour above
+
+function buildMockBatches(nowMs, forFirestore){
+  return MOCK_SPEC.map((spec, i)=>{
+    const farmer = FARMERS.find(f=>f.id === spec.farmerId);
+    const collectedMs = nowMs - spec.hoursAgo * 3600000;
+    const events = [{
+      type:"created", by:"Demo seed", at: new Date(collectedMs).toISOString(),
+      detail:`Logged ${spec.liters} L, temp: ${TEMP_LABELS[spec.band]}`
+    }];
+    let status = "pending";
+    if (spec.status === "poured" || spec.status === "poured_override"){
+      status = "poured";
+      const pouredMs = nowMs - (spec.pouredHoursAgo != null ? spec.pouredHoursAgo : spec.hoursAgo) * 3600000;
+      events.push({
+        type: spec.status, by:"Demo seed", at: new Date(pouredMs).toISOString(),
+        detail: spec.status === "poured_override"
+          ? `Poured despite At risk — ${spec.reason}`
+          : "Poured into main vat"
+      });
+    } else if (spec.status === "disputed"){
+      status = "disputed";
+      events.push({
+        type:"disputed", by:"Demo seed", at: new Date(collectedMs + 20*60000).toISOString(),
+        detail: spec.disputeText
+      });
+    }
+    const batch = {
+      farmer: farmer.name, farmerId: farmer.id, liters: spec.liters, band: spec.band,
+      note:"", status, createdBy:"Demo seed", events
+    };
+    if (forFirestore){
+      batch.collectedAt = firebase.firestore.Timestamp.fromMillis(collectedMs);
+    } else {
+      batch.id = "mock_" + i;
+      batch.collectedAt = { toMillis: ()=>collectedMs };
+    }
+    return batch;
+  });
+}
+
+function seedLocalMock(){
+  const nowMs = Date.now();
+  localBatches = buildMockBatches(nowMs, false);
+  vatState.startedAt = nowMs - MOCK_VAT_STARTED_HOURS_AGO * 3600000;
+}
+
+$("seedBtn").addEventListener("click", async ()=>{
+  const btn = $("seedBtn");
+  btn.disabled = true;
+  btn.textContent = "Loading…";
+  try{
+    const nowMs = Date.now();
+    const batches = buildMockBatches(nowMs, true);
+    await Promise.all(batches.map(b => db.collection("batches").add(b)));
+    await db.collection("meta").doc("vat").set({
+      startedAt: firebase.firestore.Timestamp.fromMillis(nowMs - MOCK_VAT_STARTED_HOURS_AGO * 3600000),
+      capacityL: VAT_CAPACITY_L
+    }, { merge: true });
+    toast("Sample data loaded");
+    $("seedBanner").style.display = "none";
+  } catch(err){
+    console.error(err);
+    toast("Could not load sample data — check Firestore rules");
+    btn.disabled = false;
+    btn.textContent = "Load sample data";
+  }
+});
+
+// ---------- SMS-ready pickup summary ----------
+function buildSmsSummary(){
+  const list = usingFirestore ? currentFirestoreBatches : localBatches;
+  const pending = list.filter(b=>b.status==="pending" || b.status==="disputed");
+  const withRisk = pending.map(b=>{
+    const ms = b.collectedAt && b.collectedAt.toMillis ? b.collectedAt.toMillis() : Date.now();
+    return { b, r: riskFor(ms, b.band) };
+  });
+  const totalL = pending.reduce((s,b)=>s + Number(b.liters||0), 0);
+  const urgent = withRisk.filter(x => x.r.level === "risk" || x.r.level === "spoiled")
+    .sort((a,b)=>a.r.remainingH - b.r.remainingH);
+  const { totalL: vatTotalL } = vatSession(list);
+
+  const lines = [];
+  lines.push(`SheetalTrack pickup summary — ${new Date().toLocaleString()}`);
+  lines.push(`Pending batches: ${pending.length} (${totalL.toFixed(1)} L)`);
+  lines.push(`Vat: ${vatTotalL.toFixed(1)} / ${VAT_CAPACITY_L} L`);
+  lines.push(`Urgent (at risk or spoiled): ${urgent.length}`);
+  if (urgent.length){
+    const names = urgent.slice(0,6).map(x => (x.b.farmerId ? x.b.farmerId + " " : "") + x.b.farmer);
+    lines.push("Priority farmers: " + names.join(", ") + (urgent.length > 6 ? ` +${urgent.length-6} more` : ""));
+    lines.push("PRIORITY PICKUP NEEDED");
+  } else {
+    lines.push("No urgent pickup required right now.");
+  }
+  return lines.join("\n");
+}
+
+function showSmsModal(){
+  const text = buildSmsSummary();
+  const back = document.createElement("div");
+  back.className = "modal-back";
+  back.innerHTML = `
+    <div class="modal sms-summary">
+      <h3>Pickup summary for tanker driver</h3>
+      <p>Copy this, or open it directly in your messaging app.</p>
+      <textarea id="smsText" readonly></textarea>
+      <div class="modal-btns">
+        <button class="btn-ghost" id="smsCloseBtn" style="flex:1">Close</button>
+        <button class="btn-primary" id="smsCopyBtn" style="flex:1">Copy text</button>
+      </div>
+      <div class="modal-btns">
+        <a class="btn-ghost" id="smsOpenBtn" style="flex:1;text-align:center;text-decoration:none;display:block">Open in Messages</a>
+      </div>
+    </div>`;
+  document.body.appendChild(back);
+  const ta = back.querySelector("#smsText");
+  ta.value = text;
+  back.querySelector("#smsOpenBtn").href = "sms:?body=" + encodeURIComponent(text);
+  back.querySelector("#smsCloseBtn").onclick = ()=>back.remove();
+  back.querySelector("#smsCopyBtn").onclick = async ()=>{
+    try{
+      await navigator.clipboard.writeText(text);
+      toast("Copied to clipboard");
+    } catch(err){
+      ta.select();
+      toast("Select-all done — copy with your keyboard");
+    }
+  };
+}
+$("smsBtn").addEventListener("click", showSmsModal);
+
+// ---------- boot ----------
+let currentFirestoreBatches = [];
+
+function setModeBadge(live){
+  const el = $("modeBadge");
+  if (live){
+    el.className = "mode-badge live";
+    el.innerHTML = `<span class="dot2"></span>Shared live mode — all agents see this`;
+  } else {
+    el.className = "mode-badge local";
+    el.innerHTML = `<span class="dot2"></span>Local demo mode — this device only`;
+  }
+}
+
+function boot(){
+  const configured = FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId;
+  if (configured){
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    usingFirestore = true;
+    $("connDot").classList.remove("off");
+    setModeBadge(true);
+
+    unsub = db.collection("batches").orderBy("collectedAt","desc").limit(200)
+      .onSnapshot(snap=>{
+        currentFirestoreBatches = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+        firestoreSnapshotReceived = true;
+        $("seedBanner").style.display = currentFirestoreBatches.length === 0 ? "block" : "none";
+        render();
+      }, err=>{
+        console.error(err);
+        toast("Connection error — check Firestore rules");
+      });
+
+    vatUnsub = db.collection("meta").doc("vat").onSnapshot(snap=>{
+      const d = snap.data();
+      vatState.startedAt = (d && d.startedAt) ? d.startedAt.toMillis() : null;
+      render();
+    }, err=>console.error(err));
+  } else {
+    $("configWarning").style.display = "block";
+    $("connDot").classList.add("off");
+    setModeBadge(false);
+    seedLocalMock();
+    render();
+  }
+  setInterval(render, 15000); // refresh countdowns
+}
+boot();
+</script>
+</body>
+</html>
